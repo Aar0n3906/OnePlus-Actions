@@ -188,7 +188,7 @@ jobs:
       - name: "📦 Cache & Install Dependencies | 缓存 & 安装构建依赖"
         uses: awalsh128/cache-apt-pkgs-action@latest 
         with: 
-          packages: python3 git curl ccache libelf-dev build-essential flex bison libssl-dev libncurses-dev liblz4-tool zlib1g-dev libxml2-utils rsync unzip gawk dos2unix
+          packages: python3 git curl ccache libelf-dev build-essential flex bison libssl-dev libncurses-dev liblz4-tool zlib1g-dev libxml2-utils rsync unzip gawk dos2unix dwarves
           execute_install_scripts: true
 
       - name: "💾 Restore ccache | 恢复ccache缓存"
@@ -513,11 +513,13 @@ jobs:
           fi
 
           if [ "${{ github.event.inputs.eBPF_BTF }}" == "On" ]; then
-            echo "📦 启用 eBPF/BTF 支持 (生成 /sys/kernel/btf/vmlinux)..."
+            echo "📦 启用 eBPF/BTF 支持并强制指定 DWARF4..."
             CONFIG_FILE="./common/arch/arm64/configs/gki_defconfig"
-            sed -i '/^CONFIG_DEBUG_INFO=/d;/^CONFIG_DEBUG_INFO_BTF=/d' "$CONFIG_FILE"
-            #echo "CONFIG_DEBUG_INFO=y" >> "$CONFIG_FILE"
-            #echo "CONFIG_DEBUG_INFO_BTF=y" >> "$CONFIG_FILE"
+            sed -i '/^CONFIG_DEBUG_INFO=/d;/^CONFIG_DEBUG_INFO_BTF=/d;/^CONFIG_DEBUG_INFO_DWARF4=/d;/^CONFIG_DEBUG_INFO_DWARF5=/d' "$CONFIG_FILE"
+            echo "CONFIG_DEBUG_INFO=y" >> "$CONFIG_FILE"
+            echo "CONFIG_DEBUG_INFO_DWARF4=y" >> "$CONFIG_FILE"
+            echo "CONFIG_DEBUG_INFO_DWARF5=n" >> "$CONFIG_FILE"
+            echo "CONFIG_DEBUG_INFO_BTF=y" >> "$CONFIG_FILE"
           fi
 
           #跳过将uapi标准头安装到 usr/include 目录的不必要操作，节省编译时间
@@ -530,35 +532,38 @@ jobs:
       - name: "🔨 Build Kernel | 编译内核"
         run: |
           echo "🏗️ 开始内核编译..."
+          echo "🔧 打印当前系统 pahole 版本信息："
+          pahole --version || echo "pahole not found"
+          
           if [ "${{ github.event.inputs.KERNEL_VERSION }}" == "6.1" ]; then
             export KBUILD_BUILD_TIMESTAMP="Tue Dec 12 12:32:56 UTC 2025"
             export KBUILD_BUILD_VERSION=1
             export PATH="$GITHUB_WORKSPACE/kernel_workspace/kernel_platform/prebuilts/clang/host/linux-x86/clang-r487747c/bin:$PATH"
             export PATH="/usr/lib/ccache:$PATH"
-            sudo apt install libelf-dev
+            sudo apt install -y libelf-dev dwarves
             cd kernel_workspace/kernel_platform/common
-            make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" RUSTC=../../prebuilts/rust/linux-x86/1.73.0b/bin/rustc PAHOLE=../../prebuilts/kernel-build-tools/linux-x86/bin/pahole LD=ld.lld HOSTLD=ld.lld O=out KCFLAGS+=-O2 gki_defconfig all
+            make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" RUSTC=../../prebuilts/rust/linux-x86/1.73.0b/bin/rustc PAHOLE=pahole LD=ld.lld HOSTLD=ld.lld O=out KCFLAGS+=-O2 gki_defconfig all
                       
           elif [ "${{ github.event.inputs.KERNEL_VERSION }}" == "6.6" ]; then
             export PATH="/usr/lib/ccache:$GITHUB_WORKSPACE/kernel_workspace/kernel_platform/prebuilts/clang/host/linux-x86/clang-r510928/bin:$PATH" 
             export PATH="/usr/lib/ccache:$PATH"
-            sudo apt install libelf-dev
+            sudo apt install -y libelf-dev dwarves
             cd kernel_workspace/kernel_platform/common
-            make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" RUSTC=../../prebuilts/rust/linux-x86/1.73.0b/bin/rustc PAHOLE=../../prebuilts/kernel-build-tools/linux-x86/bin/pahole LD=ld.lld HOSTLD=ld.lld O=out KCFLAGS+=-O2  gki_defconfig all
+            make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" RUSTC=../../prebuilts/rust/linux-x86/1.73.0b/bin/rustc PAHOLE=pahole LD=ld.lld HOSTLD=ld.lld O=out KCFLAGS+=-O2  gki_defconfig all
             
           elif [ "${{ github.event.inputs.KERNEL_VERSION }}" == "5.15" ]; then
             export PATH="$GITHUB_WORKSPACE/kernel_workspace/kernel_platform/prebuilts/clang/host/linux-x86/clang-r450784e/bin:$PATH"
             export PATH="/usr/lib/ccache:$PATH"
-            sudo apt install libelf-dev
+            sudo apt install -y libelf-dev dwarves
             cd kernel_workspace/kernel_platform/common
-            make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" RUSTC=../../prebuilts/rust/linux-x86/1.73.0b/bin/rustc PAHOLE=../../prebuilts/kernel-build-tools/linux-x86/bin/pahole LD=ld.lld HOSTLD=ld.lld O=out gki_defconfig all
+            make -j$(nproc --all) LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" RUSTC=../../prebuilts/rust/linux-x86/1.73.0b/bin/rustc PAHOLE=pahole LD=ld.lld HOSTLD=ld.lld O=out gki_defconfig all
             
           elif [ "${{ github.event.inputs.KERNEL_VERSION }}" == "5.10" ]; then
             export PATH="$GITHUB_WORKSPACE/kernel_workspace/kernel_platform/prebuilts-master/clang/host/linux-x86/clang-r416183b/bin:$PATH"
             export PATH="/usr/lib/ccache:$PATH"
-            sudo apt install libelf-dev
+            sudo apt install -y libelf-dev dwarves
             cd kernel_workspace/kernel_platform/common
-            make -j$(nproc --all) LLVM_IAS=1 LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" RUSTC=../../prebuilts/rust/linux-x86/1.73.0b/bin/rustc PAHOLE=../../prebuilts/kernel-build-tools/linux-x86/bin/pahole LD=ld.lld HOSTLD=ld.lld O=out gki_defconfig all
+            make -j$(nproc --all) LLVM_IAS=1 LLVM=1 ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC="ccache clang" RUSTC=../../prebuilts/rust/linux-x86/1.73.0b/bin/rustc PAHOLE=pahole LD=ld.lld HOSTLD=ld.lld O=out gki_defconfig all
           fi
           
           # 显示ccache统计信息
