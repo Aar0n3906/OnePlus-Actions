@@ -516,8 +516,8 @@ jobs:
             echo "📦 启用 eBPF/BTF 支持 (生成 /sys/kernel/btf/vmlinux)..."
             CONFIG_FILE="./common/arch/arm64/configs/gki_defconfig"
             sed -i '/^CONFIG_DEBUG_INFO=/d;/^CONFIG_DEBUG_INFO_BTF=/d' "$CONFIG_FILE"
-            echo "CONFIG_DEBUG_INFO=y" >> "$CONFIG_FILE"
-            echo "CONFIG_DEBUG_INFO_BTF=y" >> "$CONFIG_FILE"
+            #echo "CONFIG_DEBUG_INFO=y" >> "$CONFIG_FILE"
+            #echo "CONFIG_DEBUG_INFO_BTF=y" >> "$CONFIG_FILE"
           fi
 
           #跳过将uapi标准头安装到 usr/include 目录的不必要操作，节省编译时间
